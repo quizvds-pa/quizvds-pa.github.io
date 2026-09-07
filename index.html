@@ -478,6 +478,7 @@ window.VDS_FIG = {"1-74": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2w
       paintClock();
       timer = setInterval(tick, 1000);
     }
+    buildDots();
     show(el.test);
     render();
   }
@@ -524,7 +525,6 @@ window.VDS_FIG = {"1-74": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2w
       } else if (k === given) {
         b.classList.add("sel");
       }
-      b.addEventListener("click", function () { choose(k); });
     });
 
     if (locked) {
@@ -543,16 +543,45 @@ window.VDS_FIG = {"1-74": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2w
     paintDots();
   }
 
-  function paintDots() {
-    el.dots.innerHTML = "";
-    S.questions.forEach(function (_, k) {
+  // I pallini si costruiscono una volta sola per sessione: a ogni render
+  // aggiorno soltanto le classi, senza ricreare decine di nodi e listener.
+  var DOTS = [];
+
+  function buildDots() {
+    var frag = document.createDocumentFragment();
+    DOTS = [];
+    for (var k = 0; k < S.questions.length; k++) {
       var d = document.createElement("button");
-      d.className = "dot" + (S.given[k] !== null ? " done" : "") + (k === S.i ? " now" : "");
+      d.className = "dot";
+      d.dataset.k = k;
       d.title = "Quesito " + (k + 1);
-      d.addEventListener("click", function () { S.i = k; render(); });
-      el.dots.appendChild(d);
-    });
+      DOTS.push(d);
+      frag.appendChild(d);
+    }
+    el.dots.innerHTML = "";
+    el.dots.appendChild(frag);
   }
+
+  el.dots.addEventListener("click", function (e) {
+    var d = e.target.closest(".dot");
+    if (!d || !S) return;
+    S.i = Number(d.dataset.k);
+    render();
+  });
+
+  function paintDots() {
+    for (var k = 0; k < DOTS.length; k++) {
+      var c = "dot";
+      if (S.given[k] !== null) c += " done";
+      if (k === S.i) c += " now";
+      if (DOTS[k].className !== c) DOTS[k].className = c;
+    }
+  }
+
+  el.card.addEventListener("click", function (e) {
+    var b = e.target.closest(".opt");
+    if (b && !b.disabled) choose(Number(b.dataset.k));
+  });
 
   function choose(k) {
     if (S.locked[S.i]) return;
