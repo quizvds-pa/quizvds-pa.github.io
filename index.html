@@ -165,7 +165,6 @@ button[disabled]{opacity:.35;cursor:default}
 .storico-r:last-child{border-bottom:0}
 .storico-r span{color:var(--label2)}
 #logout{margin-bottom:36px}
-#pick-back{margin-bottom:36px}
 
 /* grafici progressi */
 .card-chart{background:var(--card);border-radius:14px;padding:16px;margin-bottom:12px;
@@ -287,7 +286,6 @@ button[disabled]{opacity:.35;cursor:default}
   <section id="pick" hidden>
     <h2>Su quale materia vuoi allenarti?</h2>
     <div id="pick-list" class="picks"></div>
-    <button id="pick-back" class="ghost wide">Torna alla home</button>
   </section>
 
   <!-- TEST -->
@@ -355,7 +353,6 @@ window.VDS_FIG = {"1-74": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2w
     home: document.getElementById("home"),
     pick: document.getElementById("pick"),
     pickList: document.getElementById("pick-list"),
-    pickBack: document.getElementById("pick-back"),
     test: document.getElementById("test"),
     result: document.getElementById("result"),
     card: document.getElementById("card"),
@@ -1036,8 +1033,6 @@ window.VDS_FIG = {"1-74": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2w
     b.addEventListener("click", function () { startSubject(Number(p)); });
     el.pickList.appendChild(b);
   });
-
-  el.pickBack.addEventListener("click", function () { show(el.home); });
 
   el.prev.addEventListener("click", function () { if (S.i > 0) { S.i--; render(); } });
   el.next.addEventListener("click", function () { if (S.i < S.questions.length - 1) { S.i++; render(); } });
