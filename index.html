@@ -787,8 +787,14 @@ window.VDS_DATA = {"parts": {"1": "AERODINAMICA", "2": "METEOROLOGIA", "3": "TEC
         if (r.error || !r.data) return;
         var rows = r.data;
         if (!rows.length) {
+          var vuoto = "<h2>I tuoi progressi</h2><div class='stat-row'>";
+          vuoto += statBox(0, "test svolti");
+          vuoto += statBox("--", "media");
+          vuoto += statBox(0, "superati");
+          vuoto += "</div>";
+          vuoto += "<p class='stat-note'>Completa il primo test: qui vedrai l'andamento, le materie da rivedere e lo storico.</p>";
+          el.stats.innerHTML = vuoto;
           el.stats.hidden = false;
-          el.stats.innerHTML = '<p class="stat-empty">Non hai ancora completato nessun test. I risultati compariranno qui.</p>';
           return;
         }
         var tot = 0, giuste = 0, superati = 0;
