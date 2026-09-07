@@ -29,7 +29,7 @@ body{margin:0;background:var(--bg);color:var(--label);
 .callsign{font-weight:700;font-size:17px}
 .ident-sub{color:var(--label2);font-size:13px;margin-left:8px}
 #quit,#signin{position:absolute;right:16px;top:50%;transform:translateY(-50%);background:none;color:var(--red);padding:6px 0;font-weight:400;box-shadow:none}
-#signin{color:var(--blue);font-weight:600}
+#signin{right:24px;color:var(--blue);font-weight:600}
 
 h1{font-size:34px;line-height:1.16;font-weight:700;letter-spacing:-.02em;margin:22px 0 18px}
 h1 br{display:none}
@@ -125,7 +125,10 @@ button[disabled]{opacity:.35;cursor:default}
 @media (max-width:600px){h1{font-size:30px}.nav{flex-wrap:wrap}.dots{order:3;width:100%}}
 
 .ident{display:flex;align-items:center;gap:10px;min-width:0}
-.brandbtn{background:none;border:0;padding:0;box-shadow:none;display:block;cursor:default}
+.brandbtn{background:none;border:0;padding:0;box-shadow:none;display:block;cursor:default;
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+  -webkit-tap-highlight-color:transparent}
+.brandbtn:active,.brandbtn:focus{opacity:1;background:none;outline:none}
 .brandbtn.clickable{cursor:pointer}
 .brand{height:52px;width:auto;display:block;max-width:80%;object-fit:contain}
 .ident-sub{color:var(--label2);font-size:13px;margin-left:0;white-space:nowrap}
@@ -203,7 +206,6 @@ button[disabled]{opacity:.35;cursor:default}
 
 .swap{display:block;width:100%;margin:6px 0 0;padding:14px 12px;border:0;box-shadow:none;
   background:none;color:var(--blue);font-weight:600;font-size:15px;text-align:center}
-.swap:hover{opacity:.7}
 
 [hidden]{display:none !important}
 
@@ -802,6 +804,7 @@ window.VDS_FIG = {"1-74": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2w
   function onLogin(user, nome) {
     USER = user;
     NOME = nome || (user.user_metadata && user.user_metadata.nome) || user.email.split("@")[0];
+    NOME = NOME.charAt(0).toUpperCase() + NOME.slice(1);
     el.hello.textContent = "Bentornato, " + NOME;
     el.logout.hidden = false;
     a.pass.value = "";
