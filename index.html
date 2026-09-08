@@ -429,6 +429,9 @@ window.VDS_FIG = {"1-74": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2w
         if (history.state && history.state.vds && history.state.vds !== "home") history.back();
       } else if (history.pushState) {
         history.pushState({ vds: nome }, "");
+        // Per il test tengo una voce di scorta: il gesto indietro del browser
+        // la consuma restando sulla schermata del test, senza il lampo della home.
+        if (nome === "test") history.pushState({ vds: "test" }, "");
       }
       SCHERMATA = nome;
     }
