@@ -437,7 +437,9 @@ window.VDS_FIG = {"1-74": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2w
   window.addEventListener("popstate", function () {
     if (SCHERMATA === "test") {
       if (history.pushState) history.pushState({ vds: "test" }, "");
-      ask("Vuoi uscire dal test? Le risposte date vanno perse.", "Esci", goHome);
+      // Se la conferma l'ha gia' aperta lo swipe, il gesto di sistema non la ripete.
+      if (Date.now() - USCITA_CHIESTA < 1500) return;
+      esciDalTest();
       return;
     }
     if (SCHERMATA === "pick" || SCHERMATA === "result" || SCHERMATA === "auth") { SCHERMATA = "home"; goHome(); }
@@ -1115,7 +1117,7 @@ window.VDS_FIG = {"1-74": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2w
     tOk = true;
   }, { passive: true });
 
-  var DAL_BORDO = false;
+  var DAL_BORDO = false, USCITA_CHIESTA = 0;
 
   function esciDalTest() {
     ask("Vuoi uscire dal test? Le risposte date vanno perse.", "Esci", goHome);
@@ -1124,7 +1126,7 @@ window.VDS_FIG = {"1-74": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2w
   function swipe(dx) {
     if (!el.test.hidden) {
       // Dal bordo sinistro si esce (con conferma), dal centro si cambia quesito.
-      if (dx > 0 && DAL_BORDO) return;   // ci pensa il gesto indietro del browser
+      if (dx > 0 && DAL_BORDO) { USCITA_CHIESTA = Date.now(); esciDalTest(); return; }
       if (dx > 0) el.prev.click(); else el.next.click();
       return;
     }
