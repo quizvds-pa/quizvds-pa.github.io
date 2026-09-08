@@ -1129,7 +1129,7 @@ window.VDS_FIG = {"1-74": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2w
   function swipe(dx) {
     if (!el.test.hidden) {
       // Dal bordo sinistro si esce (con conferma), dal centro si cambia quesito.
-      if (dx > 0 && DAL_BORDO) { USCITA_CHIESTA = Date.now(); esciDalTest(); return; }
+      if (dx > 0 && DAL_BORDO) { USCITA_CHIESTA = Date.now(); goHome(); return; }
       if (dx > 0) el.prev.click(); else el.next.click();
       return;
     }
@@ -1144,7 +1144,8 @@ window.VDS_FIG = {"1-74": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2w
     var t = e.touches[0];
     var dx = t.clientX - tX, dy = t.clientY - tY;
     if (Math.abs(dy) > 60) { tOk = false; return; }
-    if (Math.abs(dx) > 70) { tOk = false; swipe(dx); }
+    var soglia = (DAL_BORDO && dx > 0 && !el.test.hidden) ? 24 : 70;
+    if (Math.abs(dx) > soglia) { tOk = false; swipe(dx); }
   }, { passive: true });
 
   ["contextmenu", "dragstart"].forEach(function (ev) {
