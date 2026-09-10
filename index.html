@@ -973,23 +973,52 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
   }
 
   // Salva l'elenco su Supabase, cosi' vale su qualunque dispositivo.
+  var SYNC_IN_CORSO = false, ATTESA_SYNC = null, RIGHE = [];
+
+  // Legge la riga dei recuperati con una query propria: cosi' non dipende
+  // dal limite dei 200 risultati e non puo' piu' "sparire".
+  function leggiRisolti() {
+    if (!sb || !USER) return Promise.resolve();
+    return sb.from("risultati").select("*").eq("modalita", etichettaRisolti())
+      .order("creato", { ascending: true })
+      .then(function (r) {
+        var righe = (r && r.data) || [];
+        RIGA_RISOLTI = righe.length ? righe[0].id : null;
+        var dalServer = [];
+        righe.forEach(function (x) {           // se in passato se ne sono create piu' di una, le unisco
+          (x.errori || []).forEach(function (e) {
+            var k = e.p + "-" + e.n;
+            if (dalServer.indexOf(k) < 0) dalServer.push(k);
+          });
+        });
+        RISOLTI = dalServer.slice();
+        leggiLocali().forEach(function (k) { if (RISOLTI.indexOf(k) < 0) RISOLTI.push(k); });
+        scriviLocali();
+        if (RISOLTI.length > dalServer.length || righe.length > 1) sincronizzaRisolti();
+      }, function () {});
+  }
+
   function sincronizzaRisolti() {
-    if (!sb || !USER) return;
+    if (!sb || !USER || SYNC_IN_CORSO) return;
     var payload = RISOLTI.map(function (k) {
       var v = k.split("-");
       return { p: Number(v[0]), n: Number(v[1]) };
     });
     if (RIGA_RISOLTI) {
-      sb.from("risultati").update({ errori: payload }).eq("id", RIGA_RISOLTI).then(function () {});
+      SYNC_IN_CORSO = true;
+      sb.from("risultati").update({ errori: payload }).eq("id", RIGA_RISOLTI)
+        .then(function () { SYNC_IN_CORSO = false; }, function () { SYNC_IN_CORSO = false; });
     } else {
+      SYNC_IN_CORSO = true;
       sb.from("risultati").insert({
         user_id: USER.id,
         modalita: etichettaRisolti(),
         materia: null, totale: 0, corrette: 0,
         errori: payload
       }).select().then(function (r) {
+        SYNC_IN_CORSO = false;
         if (r && r.data && r.data[0]) RIGA_RISOLTI = r.data[0].id;
-      });
+      }, function () { SYNC_IN_CORSO = false; });
     }
   }
 
@@ -998,7 +1027,8 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
     if (RISOLTI.indexOf(k) < 0) {
       RISOLTI.push(k);
       scriviLocali();
-      sincronizzaRisolti();
+      clearTimeout(ATTESA_SYNC);
+      ATTESA_SYNC = setTimeout(sincronizzaRisolti, 400);
     }
   }
 
@@ -1045,7 +1075,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
   function caricaProgressi() {
     if (!sb || !USER) return;
     if (COL_SPECIALITA === null) { controllaColonna().then(caricaProgressi); return; }
-    var q = sb.from("risultati").select("*");
+    var q = sb.from("risultati").select("*").not("modalita", "like", "risolti@%");
     if (COL_SPECIALITA) q = q.eq("specialita", SPECIALITA);
     q.order("creato", { ascending: false }).limit(200)
       .then(function (r) {
@@ -1069,27 +1099,13 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
             return s === SPECIALITA;
           });
         }
-        // La riga speciale dei recuperati non e' un test: la estraggo e la escludo.
-        var etichetta = etichettaRisolti();
-        var riga = null;
-        rows = rows.filter(function (x) {
-          if (String(x.modalita || "") === etichetta) { if (!riga) riga = x; return false; }
-          return String(x.modalita || "").indexOf("risolti@") !== 0;
-        });
         rows.forEach(function (x) {
           var m = String(x.modalita || "");
           var i = m.indexOf("@");
           if (i > -1) x.modalita = m.slice(0, i);
         });
-        RIGA_RISOLTI = riga ? riga.id : null;
-        var dalServer = riga ? (riga.errori || []).map(function (e) { return e.p + "-" + e.n; }) : [];
-        var locali = leggiLocali();
-        RISOLTI = dalServer.slice();
-        locali.forEach(function (k) { if (RISOLTI.indexOf(k) < 0) RISOLTI.push(k); });
-        scriviLocali();
-        if (RISOLTI.length > dalServer.length) sincronizzaRisolti();
-
-        calcolaRipasso(rows);
+        RIGHE = rows;
+        leggiRisolti().then(function () { calcolaRipasso(RIGHE); });
 
         if (!rows.length) {
           var vuoto = "<h2>I tuoi progressi</h2><div class='stat-row'>";
