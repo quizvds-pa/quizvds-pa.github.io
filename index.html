@@ -302,6 +302,12 @@ img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
         <p>Dieci quesiti su una sola delle nove materie. Correzione alla fine.</p>
         <span class="mode-go">Scegli la materia</span>
       </button>
+
+      <button class="mode" id="mode-ripasso" hidden>
+        <span class="mode-name">Ripasso</span>
+        <p id="ripasso-desc">I quesiti che hai sbagliato, dai piu' ostici in giu'.</p>
+        <span class="mode-go">Ripassa gli errori</span>
+      </button>
     </div>
 
     <p class="soglia">In tutte le modalità la prova è superata dal 70% di risposte corrette.</p>
@@ -416,6 +422,8 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
     hello: document.getElementById("hello"),
     stats: document.getElementById("stats"),
     spec: document.getElementById("spec"),
+    ripasso: document.getElementById("mode-ripasso"),
+    ripassoDesc: document.getElementById("ripasso-desc"),
     pickTot: document.getElementById("pick-tot"),
     logout: document.getElementById("logout")
   };
@@ -625,6 +633,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
   function choose(k) {
     if (S.locked[S.i]) return;
     S.given[S.i] = k;
+    if (S.mode === "ripasso" && k === S.questions[S.i].a) segnaRisolto(S.questions[S.i]);
     if (S.instant) {
       S.locked[S.i] = true;
       render();
@@ -896,6 +905,8 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
         el.hello.textContent = "Quiz VDS";
         el.logout.hidden = true;
         el.stats.hidden = true;
+        el.ripasso.hidden = true;
+        DA_RIPASSARE = [];
         show(el.home);
       });
     });
@@ -916,10 +927,12 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
       errori: errori
     };
     if (COL_SPECIALITA !== false) riga.specialita = SPECIALITA;
+    else riga.modalita = S.mode + "@" + SPECIALITA;   // niente colonna: lo annoto qui
     sb.from("risultati").insert(riga).then(function (r) {
       if (r && r.error && COL_SPECIALITA !== false) {
         COL_SPECIALITA = false;
         delete riga.specialita;
+        riga.modalita = S.mode + "@" + SPECIALITA;
         sb.from("risultati").insert(riga).then(function () { caricaProgressi(); });
         return;
       }
@@ -935,6 +948,65 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
       COL_SPECIALITA = !r.error;
       return COL_SPECIALITA;
     }, function () { COL_SPECIALITA = false; return false; });
+  }
+
+  // ---------- ripasso degli errori ----------
+
+  var DA_RIPASSARE = [];
+
+  function chiaveRisolti() { return "vds_risolti_" + SPECIALITA; }
+
+  function risolti() {
+    try { return JSON.parse(localStorage.getItem(chiaveRisolti()) || "[]"); }
+    catch (e) { return []; }
+  }
+
+  function segnaRisolto(q) {
+    var v = risolti(), k = q.p + "-" + q.n;
+    if (v.indexOf(k) < 0) {
+      v.push(k);
+      try { localStorage.setItem(chiaveRisolti(), JSON.stringify(v)); } catch (e) {}
+    }
+  }
+
+  function calcolaRipasso(rows) {
+    var conta = {};
+    rows.forEach(function (r) {
+      (r.errori || []).forEach(function (e) {
+        var k = e.p + "-" + e.n;
+        conta[k] = (conta[k] || 0) + 1;
+      });
+    });
+    var fatti = risolti();
+    fatti.forEach(function (k) { delete conta[k]; });
+
+    var indice = {};
+    ALL.forEach(function (q) { indice[q.p + "-" + q.n] = q; });
+
+    DA_RIPASSARE = Object.keys(conta)
+      .filter(function (k) { return indice[k]; })
+      .sort(function (a, b) { return conta[b] - conta[a]; })
+      .map(function (k) { return indice[k]; });
+
+    // La scheda si vede solo da utente collegato: senza cronologia non ha senso.
+    el.ripasso.hidden = !USER;
+    el.ripasso.disabled = DA_RIPASSARE.length === 0;
+    el.ripassoDesc.textContent = DA_RIPASSARE.length
+      ? DA_RIPASSARE.length + " quesiti sbagliati, dai più ostici in giù. Quando ne indovini uno, esce dalla lista."
+      : "Per ora non hai errori da recuperare su questo apparecchio.";
+    el.ripasso.querySelector(".mode-go").textContent =
+      DA_RIPASSARE.length ? "Ripassa gli errori" : "Niente da ripassare";
+  }
+
+  function startRipasso() {
+    if (!DA_RIPASSARE.length) return;
+    begin({
+      mode: "ripasso",
+      label: "Ripasso",
+      questions: DA_RIPASSARE.slice(),
+      instant: true,
+      seconds: 0
+    });
   }
 
   function caricaProgressi() {
@@ -953,6 +1025,24 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
         }
         if (!r.data) return;
         var rows = r.data;
+
+        // Senza la colonna dedicata l'apparecchio sta in coda a "modalita".
+        // Le righe vecchie, senza indicazione, sono del multiassi.
+        if (!COL_SPECIALITA) {
+          rows = rows.filter(function (x) {
+            var m = String(x.modalita || "");
+            var i = m.indexOf("@");
+            var s = i < 0 ? "multiassi" : m.slice(i + 1);
+            return s === SPECIALITA;
+          });
+        }
+        rows.forEach(function (x) {
+          var m = String(x.modalita || "");
+          var i = m.indexOf("@");
+          if (i > -1) x.modalita = m.slice(0, i);
+        });
+        calcolaRipasso(rows);
+
         if (!rows.length) {
           var vuoto = "<h2>I tuoi progressi</h2><div class='stat-row'>";
           vuoto += statBox(0, "test svolti");
@@ -1181,6 +1271,8 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
     el.spec.appendChild(frag);
     el.spec.value = SPECIALITA;
   })();
+
+  el.ripasso.addEventListener("click", startRipasso);
 
   el.spec.addEventListener("change", function () {
     SPECIALITA = el.spec.value;
