@@ -1075,7 +1075,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
   function caricaProgressi() {
     if (!sb || !USER) return;
     if (COL_SPECIALITA === null) { controllaColonna().then(caricaProgressi); return; }
-    var q = sb.from("risultati").select("*").not("modalita", "like", "risolti@%");
+    var q = sb.from("risultati").select("*");
     if (COL_SPECIALITA) q = q.eq("specialita", SPECIALITA);
     q.order("creato", { ascending: false }).limit(200)
       .then(function (r) {
@@ -1099,6 +1099,9 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
             return s === SPECIALITA;
           });
         }
+        rows = rows.filter(function (x) {
+          return String(x.modalita || "").indexOf("risolti@") !== 0;
+        });
         rows.forEach(function (x) {
           var m = String(x.modalita || "");
           var i = m.indexOf("@");
