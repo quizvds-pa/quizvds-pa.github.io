@@ -507,7 +507,16 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
   }
 
   function titleCase(s) {
-    return s.charAt(0) + s.slice(1).toLowerCase();
+    s = String(s == null ? "" : s);
+    return s ? s.charAt(0) + s.slice(1).toLowerCase() : "";
+  }
+
+  function nomeModalita(x) {
+    if (x.modalita === "esame") return "Simulazione";
+    if (x.modalita === "pratica") return "Esercitazione";
+    if (x.modalita === "ripasso") return "Ripasso";
+    var nome = titleCase(PARTS[x.materia]);
+    return nome || "Test";
   }
 
   function begin(cfg) {
@@ -1145,7 +1154,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
           var ok = x.corrette / x.totale >= SOGLIA;
           var d = new Date(x.creato);
           h += "<div class='storico-r'><span>" + d.toLocaleDateString("it-IT") + " · " +
-               (x.modalita === "esame" ? "Simulazione" : x.modalita === "pratica" ? "Esercitazione" : titleCase(PARTS[x.materia])) +
+               nomeModalita(x) +
                "</span><b class='" + (ok ? "right" : "given") + "'>" + x.corrette + "/" + x.totale + "</b></div>";
         });
         h += "</div>";
