@@ -305,7 +305,7 @@ img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
 
       <button class="mode" id="mode-ripasso" hidden>
         <span class="mode-name">Ripasso</span>
-        <p id="ripasso-desc">I quesiti che hai sbagliato, dai piu' ostici in giu'.</p>
+        <p id="ripasso-desc">I quesiti che hai sbagliato, ordinati per frequenza dell'errore.</p>
         <span class="mode-go">Ripassa gli errori</span>
       </button>
     </div>
@@ -1025,8 +1025,8 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
     el.ripasso.hidden = !USER;
     el.ripasso.disabled = DA_RIPASSARE.length === 0;
     el.ripassoDesc.textContent = DA_RIPASSARE.length
-      ? DA_RIPASSARE.length + " quesiti sbagliati, dai più ostici in giù. Quando ne indovini uno, esce dalla lista."
-      : "Per ora non hai errori da recuperare su questo apparecchio.";
+      ? DA_RIPASSARE.length + " quesiti da recuperare, ordinati per frequenza dell'errore. Una risposta corretta lo rimuove dall'elenco."
+      : "Nessun errore da recuperare su questo apparecchio.";
     el.ripasso.querySelector(".mode-go").textContent =
       DA_RIPASSARE.length ? "Ripassa gli errori" : "Niente da ripassare";
   }
