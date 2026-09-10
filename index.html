@@ -905,6 +905,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
     a.pass.value = "";
     show(el.home);
     caricaProgressi();
+    aggiornaRipasso();
   }
 
   el.logout.addEventListener("click", function () {
@@ -935,29 +936,17 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
       corrette: right,
       errori: errori
     };
-    if (COL_SPECIALITA !== false) riga.specialita = SPECIALITA;
-    else riga.modalita = S.mode + "@" + SPECIALITA;   // niente colonna: lo annoto qui
+    riga.modalita = S.mode + "@" + SPECIALITA;
     sb.from("risultati").insert(riga).then(function (r) {
-      if (r && r.error && COL_SPECIALITA !== false) {
-        COL_SPECIALITA = false;
-        delete riga.specialita;
-        riga.modalita = S.mode + "@" + SPECIALITA;
-        sb.from("risultati").insert(riga).then(function () { caricaProgressi(); });
-        return;
-      }
+      if (r && r.error) console.error("Risultato non salvato:", r.error);
       caricaProgressi();
+      aggiornaRipasso();
     });
   }
 
-  var COL_SPECIALITA = null;   // null = da verificare, poi true/false
-
-  // Verifico una volta sola se la tabella ha la colonna specialita'.
-  function controllaColonna() {
-    return sb.from("risultati").select("specialita").limit(1).then(function (r) {
-      COL_SPECIALITA = !r.error;
-      return COL_SPECIALITA;
-    }, function () { COL_SPECIALITA = false; return false; });
-  }
+  // L'apparecchio viaggia in coda al campo "modalita" ("esame@autogiro"):
+  // funziona con lo schema attuale, senza modifiche al database.
+  var COL_SPECIALITA = false;
 
   // ---------- ripasso degli errori ----------
 
@@ -982,30 +971,9 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
   }
 
   // Salva l'elenco su Supabase, cosi' vale su qualunque dispositivo.
-  var SYNC_IN_CORSO = false, ATTESA_SYNC = null, RIGHE = [];
+  var SYNC_IN_CORSO = false, ATTESA_SYNC = null;
 
-  // Legge la riga dei recuperati con una query propria: cosi' non dipende
-  // dal limite dei 200 risultati e non puo' piu' "sparire".
-  function leggiRisolti() {
-    if (!sb || !USER) return Promise.resolve();
-    return sb.from("risultati").select("*").eq("modalita", etichettaRisolti())
-      .order("creato", { ascending: true })
-      .then(function (r) {
-        var righe = (r && r.data) || [];
-        RIGA_RISOLTI = righe.length ? righe[0].id : null;
-        var dalServer = [];
-        righe.forEach(function (x) {           // se in passato se ne sono create piu' di una, le unisco
-          (x.errori || []).forEach(function (e) {
-            var k = e.p + "-" + e.n;
-            if (dalServer.indexOf(k) < 0) dalServer.push(k);
-          });
-        });
-        RISOLTI = dalServer.slice();
-        leggiLocali().forEach(function (k) { if (RISOLTI.indexOf(k) < 0) RISOLTI.push(k); });
-        scriviLocali();
-        if (RISOLTI.length > dalServer.length || righe.length > 1) sincronizzaRisolti();
-      }, function () {});
-  }
+
 
   function sincronizzaRisolti() {
     if (!sb || !USER || SYNC_IN_CORSO) return;
@@ -1070,6 +1038,41 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
       DA_RIPASSARE.length ? "Ripassa gli errori" : "Niente da ripassare";
   }
 
+  // Il ripasso vive per conto suo: query propria, errori propri.
+  // Se si rompe qualcosa qui, le statistiche non se ne accorgono, e viceversa.
+  function aggiornaRipasso() {
+    if (!sb || !USER) { el.ripasso.hidden = true; return; }
+    sb.from("risultati").select("modalita,errori").limit(500)
+      .then(function (r) {
+        if (r.error || !r.data) { el.ripasso.hidden = true; return; }
+        try {
+          var etichetta = etichettaRisolti();
+          var fatti = [], test = [];
+          r.data.forEach(function (x) {
+            var m = String(x.modalita || "");
+            if (m === etichetta) {
+              (x.errori || []).forEach(function (e) {
+                var k = e.p + "-" + e.n;
+                if (fatti.indexOf(k) < 0) fatti.push(k);
+              });
+              return;
+            }
+            if (m.indexOf("risolti@") === 0) return;
+            var i = m.indexOf("@");
+            var s = i < 0 ? "multiassi" : m.slice(i + 1);
+            if (s === SPECIALITA) test.push(x);
+          });
+          RISOLTI = fatti.slice();
+          leggiLocali().forEach(function (k) { if (RISOLTI.indexOf(k) < 0) RISOLTI.push(k); });
+          scriviLocali();
+          calcolaRipasso(test);
+        } catch (err) {
+          console.error("Ripasso non calcolato:", err);
+          el.ripasso.hidden = true;
+        }
+      }, function () { el.ripasso.hidden = true; });
+  }
+
   function startRipasso() {
     if (!DA_RIPASSARE.length) return;
     begin({
@@ -1083,9 +1086,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
 
   function caricaProgressi() {
     if (!sb || !USER) return;
-    if (COL_SPECIALITA === null) { controllaColonna().then(caricaProgressi); return; }
     var q = sb.from("risultati").select("*");
-    if (COL_SPECIALITA) q = q.eq("specialita", SPECIALITA);
     q.order("creato", { ascending: false }).limit(200)
       .then(function (r) {
         if (r.error) {
@@ -1100,7 +1101,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
 
         // Senza la colonna dedicata l'apparecchio sta in coda a "modalita".
         // Le righe vecchie, senza indicazione, sono del multiassi.
-        if (!COL_SPECIALITA) {
+        {
           rows = rows.filter(function (x) {
             var m = String(x.modalita || "");
             var i = m.indexOf("@");
@@ -1116,8 +1117,20 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
           var i = m.indexOf("@");
           if (i > -1) x.modalita = m.slice(0, i);
         });
-        RIGHE = rows;
-        leggiRisolti().then(function () { calcolaRipasso(RIGHE); });
+        try {
+          disegnaProgressi(rows);
+        } catch (err) {
+          console.error("Progressi non disegnati:", err);
+          el.stats.innerHTML = "<h2>I tuoi progressi</h2><p class='stat-note'>" +
+            "Qualcosa non torna nei dati salvati. Riprova piu' tardi.</p>";
+          el.stats.hidden = false;
+        }
+      }, function (err) {
+        console.error("Progressi non caricati:", err);
+      });
+  }
+
+  function disegnaProgressi(rows) {
 
         if (!rows.length) {
           var vuoto = "<h2>I tuoi progressi</h2><div class='stat-row'>";
@@ -1160,7 +1173,6 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
         h += "</div>";
         el.stats.innerHTML = h;
         el.stats.hidden = false;
-      });
   }
 
 
@@ -1356,6 +1368,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
     componiBanco();
     costruisciMaterie();
     caricaProgressi();
+    aggiornaRipasso();
   });
 
   el.signin.addEventListener("click", function () { paintAuthMode(); show(el.auth); });
