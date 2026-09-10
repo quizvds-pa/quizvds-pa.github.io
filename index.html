@@ -815,7 +815,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
   function emailDiServizio(u) { return u + "@quizvds.local"; }
 
   function trovaEmail(u) {
-    return sb.from("utenti").select("email").eq("username", u).maybeSingle()
+    return sb.from("utenti").select("email").ilike("username", u).maybeSingle()
       .then(function (r) {
         return (r.data && r.data.email) ? r.data.email : emailDiServizio(u);
       })
@@ -1069,17 +1069,17 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
             return s === SPECIALITA;
           });
         }
-        rows.forEach(function (x) {
-          var m = String(x.modalita || "");
-          var i = m.indexOf("@");
-          if (i > -1) x.modalita = m.slice(0, i);
-        });
         // La riga speciale dei recuperati non e' un test: la estraggo e la escludo.
         var etichetta = etichettaRisolti();
         var riga = null;
         rows = rows.filter(function (x) {
           if (String(x.modalita || "") === etichetta) { if (!riga) riga = x; return false; }
           return String(x.modalita || "").indexOf("risolti@") !== 0;
+        });
+        rows.forEach(function (x) {
+          var m = String(x.modalita || "");
+          var i = m.indexOf("@");
+          if (i > -1) x.modalita = m.slice(0, i);
         });
         RIGA_RISOLTI = riga ? riga.id : null;
         var dalServer = riga ? (riga.errori || []).map(function (e) { return e.p + "-" + e.n; }) : [];
