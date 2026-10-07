@@ -109,6 +109,25 @@ button[disabled]{opacity:.35;cursor:default}
   background:var(--card);border-radius:14px;padding:16px;margin-bottom:10px;
   box-shadow:0 1px 2px rgba(0,0,0,.06)}
 .review p{margin:4px 0;font-size:15px}
+.qhead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.segna{background:none;box-shadow:none;color:var(--label2);font-size:20px;line-height:1;
+  padding:2px 4px;flex:0 0 auto;-webkit-tap-highlight-color:transparent}
+.segna.on{color:var(--orange)}
+.altre{margin-top:10px}
+.altre summary{list-style:none;display:flex;align-items:center;justify-content:flex-end;
+  color:var(--blue);padding:6px 2px;pointer-events:none}
+.review{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.altre-box{cursor:auto}
+.riep-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.link-btn{background:none;box-shadow:none;color:var(--blue);font-size:14px;font-weight:600;padding:4px 0}
+.altre summary::-webkit-details-marker{display:none}
+.altre summary::before{content:"";width:0;height:0;border-left:5px solid currentColor;
+  border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s ease}
+.altre[open] summary::before{transform:rotate(90deg)}
+.altre-box{margin-top:6px;padding-left:2px}
+.alt{color:var(--label2);font-size:14px;margin:3px 0}
+.alt-ok{color:var(--green);font-weight:600}
+.alt-ko{color:var(--red)}
 .given{color:var(--red)}
 .right{color:var(--green)}
 
@@ -198,6 +217,7 @@ button[disabled]{opacity:.35;cursor:default}
 .bar-track{flex:1;height:8px;background:var(--sep);border-radius:100px;overflow:hidden}
 .bar-track .bar-fill{display:block;height:100%;background:var(--red);opacity:.75;border-radius:100px}
 .bar-n{min-width:1.6em;text-align:right;font-variant-numeric:tabular-nums}
+.bar-sub{min-width:3.2em;text-align:right;color:var(--label2);font-size:13px;font-variant-numeric:tabular-nums}
 
 /* password e cambio modalità */
 .pw{padding-bottom:10px}
@@ -301,6 +321,12 @@ img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
         <span class="mode-name">Quiz per materia</span>
         <p>10 quesiti su una sola delle nove materie. Correzione alla fine.</p>
         <span class="mode-go">Scegli la materia</span>
+      </button>
+
+      <button class="mode" id="mode-segnati" hidden>
+        <span class="mode-name">Da rivedere</span>
+        <p id="segnati-desc"></p>
+        <span class="mode-go">Riprendi i quesiti segnati</span>
       </button>
 
       <button class="mode" id="mode-ripasso" hidden>
@@ -423,6 +449,8 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
     stats: document.getElementById("stats"),
     spec: document.getElementById("spec"),
     ripasso: document.getElementById("mode-ripasso"),
+    segnati: document.getElementById("mode-segnati"),
+    segnatiDesc: document.getElementById("segnati-desc"),
     ripassoDesc: document.getElementById("ripasso-desc"),
     pickTot: document.getElementById("pick-tot"),
     logout: document.getElementById("logout")
@@ -562,7 +590,9 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
     el.hudCount.textContent = "Quesito " + (S.i + 1) + " di " + S.questions.length;
     el.bar.style.width = ((S.i + 1) / S.questions.length * 100) + "%";
 
-    var html = '<p class="qmeta">' + titleCase(PARTS[q.p]) + " · quesito " + q.n + "</p>";
+    var html = '<div class="qhead"><p class="qmeta">' + titleCase(PARTS[q.p]) + " · quesito " + q.n + "</p>" +
+      '<button id="segna" class="segna' + (eSegnato(q) ? " on" : "") + '" aria-label="Segna per rivederlo">' +
+      (eSegnato(q) ? "★" : "☆") + "</button></div>";
     html += '<p class="qtext">' + esc(q.q) + "</p>";
     var fig = q.fig ? (window.VDS_FIGS || {})[q.fig] : null;
     if (fig) html += '<img class="qfig" src="' + fig + '" alt="Figura del quesito">';
@@ -595,6 +625,13 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
         : "<b>Risposta sbagliata.</b>Quella corretta è la <strong>" + LETTERS[q.a] + "</strong>: " + esc(q.o[q.a]);
       el.card.appendChild(v);
     }
+
+    var bSegna = document.getElementById("segna");
+    if (bSegna) bSegna.addEventListener("click", function () {
+      segnaQuesito(q);
+      bSegna.textContent = eSegnato(q) ? "★" : "☆";
+      bSegna.classList.toggle("on", eSegnato(q));
+    });
 
     el.prev.disabled = S.i === 0;
     el.next.textContent = S.i === S.questions.length - 1 ? "Ultimo quesito" : "Avanti";
@@ -689,12 +726,15 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
     html += '<div class="actions"><button id="again">Rifai con altri quesiti</button>' +
       '<button id="home-btn" class="ghost">Torna all\'inizio</button></div>';
 
-    html += "<h2>Riepilogo dei quesiti</h2>";
+    html += '<div class="riep-h"><h2>Riepilogo dei quesiti</h2>' +
+      '<button id="apri-tutti" class="link-btn">Espandi tutto</button></div>';
     S.questions.forEach(function (q, k) {
       var g = S.given[k], ok = g === q.a;
       html += '<div class="review ' + (ok ? "rev-ok" : "rev-ko") + '">';
-      html += '<p class="qmeta">' + (k + 1) + " · " + titleCase(PARTS[q.p]) + " · quesito " + q.n +
-              ' <span class="tag ' + (ok ? "tag-ok" : "tag-ko") + '">' + (ok ? "Corretta" : "Sbagliata") + "</span></p>";
+      html += '<div class="qhead"><p class="qmeta">' + (k + 1) + " · " + titleCase(PARTS[q.p]) + " · quesito " + q.n +
+              ' <span class="tag ' + (ok ? "tag-ok" : "tag-ko") + '">' + (ok ? "Corretta" : "Sbagliata") + "</span></p>" +
+              '<button class="segna' + (eSegnato(q) ? " on" : "") + '" data-pn="' + q.p + "-" + q.n +
+              '" aria-label="Segna per rivederlo">' + (eSegnato(q) ? "★" : "☆") + "</button></div>";
       html += "<p><strong>" + esc(q.q) + "</strong></p>";
       if (ok) {
         html += '<p class="right">' + LETTERS[q.a] + ") " + esc(q.o[q.a]) + "</p>";
@@ -702,8 +742,43 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
         html += '<p class="given">' + (g === null ? "Non hai risposto." : "Tua risposta: " + LETTERS[g] + ") " + esc(q.o[g])) + "</p>";
         html += '<p class="right">Corretta: ' + LETTERS[q.a] + ") " + esc(q.o[q.a]) + "</p>";
       }
+
+      // Pannello richiudibile con tutte le alternative del quesito.
+      html += '<details class="altre"><summary aria-label="Mostra tutte le risposte"></summary><div class="altre-box">';
+      q.o.forEach(function (o, j) {
+        var cls = j === q.a ? "alt alt-ok" : (j === g ? "alt alt-ko" : "alt");
+        var nota = j === q.a ? " ✓" : (j === g ? " ✗" : "");
+        html += '<p class="' + cls + '">' + LETTERS[j] + ") " + esc(o) + nota + "</p>";
+      });
+      html += "</div></details>";
+
       html += "</div>";
     });
+
+    // Resa per materia: utile per capire dove ripassare.
+    var perM = {};
+    S.questions.forEach(function (q, k) {
+      if (!perM[q.p]) perM[q.p] = { giuste: 0, tot: 0 };
+      perM[q.p].tot++;
+      if (S.given[k] === q.a) perM[q.p].giuste++;
+    });
+    var materie = Object.keys(perM);
+    if (materie.length > 1) {
+      materie.sort(function (a, b) {
+        return perM[a].giuste / perM[a].tot - perM[b].giuste / perM[b].tot;
+      });
+      html += "<div class='card-chart'><p class='chart-t'>Resa per materia</p><div class='bars'>";
+      materie.forEach(function (k) {
+        var m = perM[k], q = Math.round(m.giuste / m.tot * 100);
+        var col = q >= Math.round(SOGLIA * 100) ? "var(--green)" : (q >= 60 ? "var(--orange)" : "var(--red)");
+        html += "<div class='bar-row'><span class='bar-lab'>" + esc(titleCase(PARTS[k])) + "</span>" +
+                "<span class='bar-track'><span class='bar-fill' style='width:" + q +
+                "%;background:" + col + "'></span></span>" +
+                "<b class='bar-n'>" + q + "%</b>" +
+                "<span class='bar-sub'>" + m.giuste + "/" + m.tot + "</span></div>";
+      });
+      html += "</div></div>";
+    }
 
     salvaRisultato(right, S.questions.length);
     el.result.innerHTML = html;
@@ -714,6 +789,33 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
       else startSubject(S.questions[0].p);
     });
     document.getElementById("home-btn").addEventListener("click", goHome);
+
+    // Tutto il riquadro apre e chiude: la freccia resta solo come indicatore.
+    el.result.addEventListener("click", function (e) {
+      var st = e.target.closest(".segna");
+      if (st) {
+        var v = st.dataset.pn.split("-");
+        var qq = { p: Number(v[0]), n: Number(v[1]) };
+        segnaQuesito(qq);
+        st.textContent = eSegnato(qq) ? "★" : "☆";
+        st.classList.toggle("on", eSegnato(qq));
+        return;
+      }
+      if (e.target.closest(".altre-box") || e.target.closest("button")) return;
+      var card = e.target.closest(".review");
+      if (!card) return;
+      if (window.getSelection && String(window.getSelection()).length) return;
+      var d = card.querySelector("details.altre");
+      if (d) d.open = !d.open;
+    });
+
+    var apri = document.getElementById("apri-tutti");
+    apri.addEventListener("click", function () {
+      var tutti = el.result.querySelectorAll("details.altre");
+      var aprire = apri.textContent === "Espandi tutto";
+      for (var i = 0; i < tutti.length; i++) tutti[i].open = aprire;
+      apri.textContent = aprire ? "Richiudi tutto" : "Espandi tutto";
+    });
   }
 
   function goHome() {
@@ -909,6 +1011,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
     show(el.home);
     caricaProgressi();
     aggiornaRipasso();
+    aggiornaSegnati();
   }
 
   el.logout.addEventListener("click", function () {
@@ -944,6 +1047,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
       if (r && r.error) console.error("Risultato non salvato:", r.error);
       caricaProgressi();
       aggiornaRipasso();
+      aggiornaSegnati();
     });
   }
 
@@ -956,6 +1060,72 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
   var DA_RIPASSARE = [];
 
   function chiaveRisolti() { return "vds_risolti_" + SPECIALITA; }
+  function chiaveSegnati() { return "vds_segnati_" + SPECIALITA; }
+
+  // ---------- quesiti segnati per rivederli ----------
+
+  var SEGNATI = [], RIGA_SEGNATI = null, ATTESA_SEGNATI = null, SYNC_SEGNATI = false;
+
+  function etichettaSegnati() { return "segnati@" + SPECIALITA; }
+
+  function leggiSegnatiLocali() {
+    try { return JSON.parse(localStorage.getItem(chiaveSegnati()) || "[]"); }
+    catch (e) { return []; }
+  }
+
+  function scriviSegnatiLocali() {
+    try { localStorage.setItem(chiaveSegnati(), JSON.stringify(SEGNATI)); } catch (e) {}
+  }
+
+  function eSegnato(q) { return SEGNATI.indexOf(q.p + "-" + q.n) > -1; }
+
+  function segnaQuesito(q) {
+    var k = q.p + "-" + q.n, i = SEGNATI.indexOf(k);
+    if (i > -1) SEGNATI.splice(i, 1); else SEGNATI.push(k);
+    scriviSegnatiLocali();
+    clearTimeout(ATTESA_SEGNATI);
+    ATTESA_SEGNATI = setTimeout(sincronizzaSegnati, 400);
+    mostraSegnati();
+  }
+
+  function sincronizzaSegnati() {
+    if (!sb || !USER || SYNC_SEGNATI) return;
+    var payload = SEGNATI.map(function (k) {
+      var v = k.split("-");
+      return { p: Number(v[0]), n: Number(v[1]) };
+    });
+    SYNC_SEGNATI = true;
+    if (RIGA_SEGNATI) {
+      sb.from("risultati").update({ errori: payload }).eq("id", RIGA_SEGNATI)
+        .then(function () { SYNC_SEGNATI = false; }, function () { SYNC_SEGNATI = false; });
+    } else {
+      sb.from("risultati").insert({
+        user_id: USER.id, modalita: etichettaSegnati(),
+        materia: null, totale: 0, corrette: 0, errori: payload
+      }).select().then(function (r) {
+        SYNC_SEGNATI = false;
+        if (r && r.data && r.data[0]) RIGA_SEGNATI = r.data[0].id;
+      }, function () { SYNC_SEGNATI = false; });
+    }
+  }
+
+  function quesitiSegnati() {
+    var indice = {};
+    ALL.forEach(function (q) { indice[q.p + "-" + q.n] = q; });
+    return SEGNATI.map(function (k) { return indice[k]; }).filter(Boolean);
+  }
+
+  function mostraSegnati() {
+    var n = quesitiSegnati().length;
+    el.segnati.hidden = n === 0;
+    el.segnatiDesc.textContent = n + (n === 1 ? " quesito messo da parte." : " quesiti messi da parte.");
+  }
+
+  function startSegnati() {
+    var qs = quesitiSegnati();
+    if (!qs.length) return;
+    begin({ mode: "segnati", label: "Da rivedere", questions: qs, instant: true, seconds: 0 });
+  }
 
   var RISOLTI = [];          // elenco condiviso, riletto dal server a ogni caricamento
   var RIGA_RISOLTI = null;   // id della riga che lo conserva
@@ -1043,6 +1213,33 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
 
   // Il ripasso vive per conto suo: query propria, errori propri.
   // Se si rompe qualcosa qui, le statistiche non se ne accorgono, e viceversa.
+  function aggiornaSegnati() {
+    SEGNATI = leggiSegnatiLocali();
+    mostraSegnati();
+    if (!sb || !USER) return;
+    sb.from("risultati").select("id,modalita,errori").eq("modalita", etichettaSegnati())
+      .order("creato", { ascending: true })
+      .then(function (r) {
+        try {
+          var righe = (r && r.data) || [];
+          RIGA_SEGNATI = righe.length ? righe[0].id : null;
+          var dalServer = [];
+          righe.forEach(function (x) {
+            (x.errori || []).forEach(function (e) {
+              var k = e.p + "-" + e.n;
+              if (dalServer.indexOf(k) < 0) dalServer.push(k);
+            });
+          });
+          var locali = leggiSegnatiLocali();
+          SEGNATI = dalServer.slice();
+          locali.forEach(function (k) { if (SEGNATI.indexOf(k) < 0) SEGNATI.push(k); });
+          scriviSegnatiLocali();
+          mostraSegnati();
+          if (SEGNATI.length > dalServer.length || righe.length > 1) sincronizzaSegnati();
+        } catch (err) { console.error("Segnati non letti:", err); }
+      }, function () {});
+  }
+
   function aggiornaRipasso() {
     if (!sb || !USER) { el.ripasso.hidden = true; return; }
     sb.from("risultati").select("modalita,errori").limit(500)
@@ -1060,7 +1257,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
               });
               return;
             }
-            if (m.indexOf("risolti@") === 0) return;
+            if (m.indexOf("risolti@") === 0 || m.indexOf("segnati@") === 0) return;
             var i = m.indexOf("@");
             var s = i < 0 ? "multiassi" : m.slice(i + 1);
             if (s === SPECIALITA) test.push(x);
@@ -1114,7 +1311,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
         }
         rows = rows.filter(function (x) {
           var m = String(x.modalita || "");
-          if (m.indexOf("risolti@") === 0) return false;
+          if (m.indexOf("risolti@") === 0 || m.indexOf("segnati@") === 0) return false;
           var i = m.indexOf("@");
           return (i < 0 ? m : m.slice(0, i)) !== "ripasso";
         });
@@ -1367,6 +1564,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
   })();
 
   el.ripasso.addEventListener("click", startRipasso);
+  el.segnati.addEventListener("click", startSegnati);
 
   el.spec.addEventListener("change", function () {
     SPECIALITA = el.spec.value;
@@ -1375,6 +1573,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
     costruisciMaterie();
     caricaProgressi();
     aggiornaRipasso();
+    aggiornaSegnati();
   });
 
   el.signin.addEventListener("click", function () { paintAuthMode(); show(el.auth); });
@@ -1444,6 +1643,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
   });
 
   if (history.replaceState) history.replaceState({ vds: "home" }, "");
+  aggiornaSegnati();
   avvia();
 
   window.addEventListener("beforeunload", function (e) {
