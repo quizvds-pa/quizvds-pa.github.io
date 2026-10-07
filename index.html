@@ -196,6 +196,18 @@ button[disabled]{opacity:.35;cursor:default}
   background:var(--card);border-radius:14px;padding:12px 16px;margin:0 0 18px;
   box-shadow:0 1px 2px rgba(0,0,0,.06)}
 .specbox span{color:var(--label2);font-size:15px}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  background:var(--card);border-radius:14px;padding:12px 16px;margin:0 0 14px;cursor:pointer;
+  box-shadow:0 1px 2px rgba(0,0,0,.06);-webkit-tap-highlight-color:transparent}
+.switch > span:first-child{font-size:15px}
+.switch em{display:block;font-style:normal;color:var(--label2);font-size:13px;margin-top:2px}
+.switch input{position:absolute;opacity:0;width:0;height:0}
+.switch .track{flex:0 0 auto;width:48px;height:29px;border-radius:100px;background:var(--sep);
+  position:relative;transition:background .18s ease}
+.switch .knob{position:absolute;top:2px;left:2px;width:25px;height:25px;border-radius:100px;
+  background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s ease}
+.switch input:checked + .track{background:var(--green)}
+.switch input:checked + .track .knob{transform:translateX(19px)}
 #spec{font:inherit;font-weight:600;color:var(--blue);background:none;border:0;
   padding:4px 0;text-align:right;text-align-last:right;max-width:62%}
 #logout{margin-bottom:36px}
@@ -345,6 +357,10 @@ img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
   <section id="pick" hidden>
     <h2>Su quale materia vuoi allenarti?</h2>
     <p id="pick-tot" class="stat-note"></p>
+    <label class="switch" for="subito">
+      <span>Correzione immediata<em>Ti dico subito se la risposta è giusta.</em></span>
+      <input type="checkbox" id="subito"><span class="track"><span class="knob"></span></span>
+    </label>
     <div id="pick-list" class="picks"></div>
   </section>
 
@@ -453,6 +469,7 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
     segnatiDesc: document.getElementById("segnati-desc"),
     ripassoDesc: document.getElementById("ripasso-desc"),
     pickTot: document.getElementById("pick-tot"),
+    subito: document.getElementById("subito"),
     logout: document.getElementById("logout")
   };
 
@@ -531,7 +548,8 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
   }
 
   function startSubject(part) {
-    begin({ mode: "materia", label: titleCase(PARTS[part]), questions: pickFrom(part, 10), instant: false, seconds: 0 });
+    begin({ mode: "materia", label: titleCase(PARTS[part]), questions: pickFrom(part, 10),
+            instant: el.subito.checked, seconds: 0 });
   }
 
   function titleCase(s) {
@@ -791,24 +809,6 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
     document.getElementById("home-btn").addEventListener("click", goHome);
 
     // Tutto il riquadro apre e chiude: la freccia resta solo come indicatore.
-    el.result.addEventListener("click", function (e) {
-      var st = e.target.closest(".segna");
-      if (st) {
-        var v = st.dataset.pn.split("-");
-        var qq = { p: Number(v[0]), n: Number(v[1]) };
-        segnaQuesito(qq);
-        st.textContent = eSegnato(qq) ? "★" : "☆";
-        st.classList.toggle("on", eSegnato(qq));
-        return;
-      }
-      if (e.target.closest(".altre-box") || e.target.closest("button")) return;
-      var card = e.target.closest(".review");
-      if (!card) return;
-      if (window.getSelection && String(window.getSelection()).length) return;
-      var d = card.querySelector("details.altre");
-      if (d) d.open = !d.open;
-    });
-
     var apri = document.getElementById("apri-tutti");
     apri.addEventListener("click", function () {
       var tutti = el.result.querySelectorAll("details.altre");
@@ -1643,6 +1643,31 @@ window.VDS_FIGS = {"1": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBD
   });
 
   if (history.replaceState) history.replaceState({ vds: "home" }, "");
+  try { el.subito.checked = localStorage.getItem("vds_materia_subito") === "1"; } catch (e) {}
+  el.subito.addEventListener("change", function () {
+    try { localStorage.setItem("vds_materia_subito", el.subito.checked ? "1" : "0"); } catch (e) {}
+  });
+
+  // Registrato UNA volta sola: dentro grade() si accumulava a ogni consegna
+  // e i gestori doppi si annullavano a vicenda.
+  el.result.addEventListener("click", function (e) {
+    var st = e.target.closest(".segna");
+    if (st) {
+      var v = st.dataset.pn.split("-");
+      var qq = { p: Number(v[0]), n: Number(v[1]) };
+      segnaQuesito(qq);
+      st.textContent = eSegnato(qq) ? "★" : "☆";
+      st.classList.toggle("on", eSegnato(qq));
+      return;
+    }
+    if (e.target.closest(".altre-box") || e.target.closest("button")) return;
+    var card = e.target.closest(".review");
+    if (!card) return;
+    if (window.getSelection && String(window.getSelection()).length) return;
+    var d = card.querySelector("details.altre");
+    if (d) d.open = !d.open;
+  });
+
   aggiornaSegnati();
   avvia();
 
